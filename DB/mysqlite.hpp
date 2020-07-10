@@ -16,7 +16,7 @@ sqlite3* DbInit()
 	ret = sqlite3_open("mmm.db", &db);
 	if (ret != SQLITE_OK)
 	{
-		perror("sqlite3_open");
+		printf("open database error\n");
 	}
 
 	return db;
@@ -28,7 +28,7 @@ void create_table(sqlite3 *db)
 	char *errmsg = NULL;
 	char *sql = NULL;
 	int ret;
-	sql = "create table if not exists userinfo(name text primary key, password text); ";
+	sql = "create table if not exists userinfo(name text primary key, password text,status integer default 0); ";
 	ret = sqlite3_exec(db, sql, NULL, NULL, &errmsg);
 	if (ret != SQLITE_OK)
 	{
@@ -41,7 +41,7 @@ void insert_record(sqlite3 *db, char *name, char *password)
 {
 	char sql[100];
 	char *errmsg = NULL;
-	sprintf(sql, "insert into userinfo values('%s', '%s'); ", name, password);
+	sprintf(sql, "insert into userinfo(name,password) values('%s', '%s'); ", name, password);
 	if (SQLITE_OK != sqlite3_exec(db, sql, NULL, NULL, &errmsg))
 	{
 		printf("insert record error : %s\n", errmsg);
@@ -60,9 +60,10 @@ void delete_record(sqlite3 *db, char *name, char *password)
 	}
 }
 
-/*用户信息表查询用户*/
-bool search_contact(sqlite3 *db, char *name, char *password)
+/*用户登录*/
+int search_contact(sqlite3 *db, char *name, char *password)
 {
+	std::string s;
 	char sql[100];
 	char *errmsg;
 	int nrow, ncolumn;
@@ -70,15 +71,53 @@ bool search_contact(sqlite3 *db, char *name, char *password)
 	int i;
 	int ret;
 
+	char sql2[100];
+	char *errmsg2;
+	int nrow2, ncolumn2;
+	char **azresult2;
+
 	sprintf(sql, "select name from userinfo where name = '%s' and password = '%s';", name, password);
 	if (SQLITE_OK != sqlite3_get_table(db, sql, &azresult, &nrow, &ncolumn, &errmsg))
 	{
-		printf("log in failed : %s\n", errmsg);
-		return false;
+		printf("select failed : %s\n", errmsg);
+	}
+
+	for (int i = ncolumn; i<(nrow + 1)*ncolumn; i++)
+	{
+		s.append((char*)azresult[i]);
+		if (!((i + 1) % ncolumn))
+			putchar(10);
+	}
+	if (s.length() == 0)
+	{
+		return 1;
 	}
 	else
 	{
-		return true;
+		sprintf(sql2, "update userinfo set status = 1 where name = '%s' ;", name);
+		if (SQLITE_OK != sqlite3_get_table(db, sql2, &azresult2, &nrow2, &ncolumn2, &errmsg2))
+		{
+			printf("update failed : %s\n", errmsg2);
+		}
+		return 0;
+	}
+}
+
+/*用户下线*/
+void search_contact_2(sqlite3 *db, char *name)
+{
+	std::string s;
+	char sql[100];
+	char *errmsg;
+	int nrow, ncolumn;
+	char **azresult;
+	int i;
+	int ret;
+
+	sprintf(sql, "update userinfo set status = 0 where name = '%s' ;", name);
+	if (SQLITE_OK != sqlite3_get_table(db, sql, &azresult, &nrow, &ncolumn, &errmsg))
+	{
+		printf("update failed : %s\n", errmsg);
 	}
 }
 
@@ -94,17 +133,20 @@ std::string search_name(sqlite3 *db)
 	int ret;
 	char a[] = { "log in…" };
 
-	sql = "select name from userinfo;";
+	sql = "select name from userinfo where status = 1;";
 	if (SQLITE_OK != sqlite3_get_table(db, sql, &azresult, &nrow, &ncolumn, &errmsg))
 	{
-		printf("log in failed : %s\n", errmsg);
+		printf("select failed : %s\n", errmsg);
 		exit(0);
 	}
 
 	for (int i = ncolumn; i<(nrow + 1)*ncolumn; i++)
 	{
+		if (i != ncolumn)
+		{
+			s.append("#");
+		}
 		s.append((char*)azresult[i]);
-		s.append("#");
 		if (!((i + 1) % ncolumn))
 			putchar(10);
 	}
@@ -125,7 +167,7 @@ void create_table_l(sqlite3 *db)
 	}
 }
 
-/*聊天记录表插入数据*/
+/*聊天记录表插入记录*/
 void insert_record_l(sqlite3 *db, char *fname, char *message,char *jname)
 {
 	char sql[100];
@@ -150,14 +192,17 @@ std::string search_message_l(sqlite3 *db,char *fname,char *jname)
 	sprintf(sql, "select message from liao where fname = '%s' and jname = '%s'; ", fname,jname);
 	if (SQLITE_OK != sqlite3_get_table(db, sql, &azresult, &nrow, &ncolumn, &errmsg))
 	{
-		printf("select in failed : %s\n", errmsg);
+		printf("select failed : %s\n", errmsg);
 		exit(0);
 	}
 
 	for (int i = ncolumn; i<(nrow + 1)*ncolumn; i++)
 	{
+		if (i != ncolumn)
+		{
+			s.append("#");
+		}
 		s.append((char*)azresult[i]);
-		s.append("#");
 		if (!((i + 1) % ncolumn))
 			putchar(10);
 	}
